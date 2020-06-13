@@ -6,6 +6,10 @@ import { ReqContent, ReqKernelSpec } from "../common/commands/types";
 import { closeNotebook } from "./actions";
 import { DESKTOP_NOTEBOOK_CLOSING_NOT_STARTED, DESKTOP_NOTEBOOK_CLOSING_READY_TO_CLOSE } from "./state";
 import { DesktopStore } from "./store";
+import { clipboard } from "electron";
+import * as plist from "plist";
+import { PlistValue } from "plist";
+import { insertImages } from "./insert-images";
 
 export function onBeforeUnloadOrReload(
   contentRef: ContentRef,
@@ -32,6 +36,65 @@ export function onBeforeUnloadOrReload(
 
   if (closingState !== DESKTOP_NOTEBOOK_CLOSING_READY_TO_CLOSE) {
     return false;
+  }
+}
+
+export function onDrop(
+  event: DragEvent,
+  contentRef: ContentRef,
+  store: DesktopStore
+) {
+  let imagePaths = ((event.dataTransfer) ? Array.from(event.dataTransfer.files) : [])
+    .filter(file => file.type.match(/image.*/))
+    .map(file => file.path);
+
+  let copyImagesToNotebookDirectory: boolean = (event.dataTransfer?.effectAllowed == "copy");
+  let linkImagesAndKeepAtOriginalPath: boolean = (event.dataTransfer?.effectAllowed == "link");
+  let embedImagesInNotebook: boolean = !(copyImagesToNotebookDirectory || linkImagesAndKeepAtOriginalPath);
+
+  insertImages({
+    imagePaths,
+    copyImagesToNotebookDirectory,
+    linkImagesAndKeepAtOriginalPath,
+    embedImagesInNotebook,
+    contentRef,
+    store
+  });
+}
+
+export function onPaste(
+  event: ClipboardEvent,
+  contentRef: ContentRef,
+  store: DesktopStore
+) {
+  // Paste image paths (macOS only).
+  // https://github.com/nteract/nteract/issues/4963#issuecomment-627561034
+  if (clipboard.has('NSFilenamesPboardType')) {
+    event.preventDefault();
+
+    let filePathsFromClipboard: Array<string> = <Array<string>><PlistValue>(plist.parse(clipboard.read('NSFilenamesPboardType')));
+    let imagePaths = filePathsFromClipboard
+      .filter(filePath => /[\w-]+\.(png|jpg|jpeg|heic|gif|tiff)/.test(filePath));
+
+    insertImages({
+      imagePaths,
+      embedImagesInNotebook: true,
+      contentRef,
+      store
+    });
+
+  // Paste blob image from the clipboard.
+  } else if (clipboard.has('public.tiff')) {
+    event.preventDefault();
+
+    let base64ImageSource = clipboard.readImage().toDataURL();
+
+    insertImages({
+      base64ImageSource,
+      embedImagesInNotebook: true,
+      contentRef,
+      store
+    });
   }
 }
 
@@ -82,4 +145,10 @@ export function initGlobalHandlers(
         filepath: filepath ?? undefined,
       } as ReqContent & ReqKernelSpec),
   );
+
+  // Listen to drag-and-drop events, e.g. to handle dropping images.
+  window.addEventListener('drop', (event) => onDrop(event, contentRef, store));
+
+  // Listen to paste evnet, e.g. to insert pasted image files.
+  window.addEventListener('paste', (event) => onPaste(<ClipboardEvent> event, contentRef, store));
 }
