@@ -61,6 +61,7 @@ The completion behavior is controlled by the following props:
 * `enableCompletion` - Boolean flag to enable/disable the behavior entirely
 * `shouldRegisterDefaultCompletion` - Boolean flag to enable/disable the default completion provider
 * `onRegisterCompletionProvider?: (languageId: string) => void` - Custom completion provider implementation for a Monaco Editor supported language.
+* `onRegisterDocumentFormattingEditProvider?: (languageId: string) => void` - Custom document formatting provider implementation for a Monaco Editor supported language.
 
 ### Performance Tip
 

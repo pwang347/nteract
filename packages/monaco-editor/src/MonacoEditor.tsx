@@ -64,6 +64,8 @@ export interface IMonacoConfiguration {
   enableCompletion?: boolean;
   shouldRegisterDefaultCompletion?: boolean;
   onCursorPositionChange?: (selection: monaco.ISelection | null) => void;
+  onRegisterDocumentFormattingEditProvider?: (languageId: string) => void;
+  enableFormatting?: boolean;
   onRegisterCompletionProvider?: (languageId: string) => void;
   language: string;
   lineNumbers?: boolean;
@@ -158,6 +160,9 @@ export default class MonacoEditor extends React.Component<IMonacoProps> {
     if (this.editorContainerRef && this.editorContainerRef.current) {
       // Register Jupyter completion provider if needed
       this.registerCompletionProvider();
+
+      // Register document formatter if needed
+      this.registerDocumentFormatter();
 
       // Use Monaco model uri if provided. Otherwise, create a new model uri using editor id.
       const uri = this.props.modelUri ? this.props.modelUri : monaco.Uri.file(this.props.id);
@@ -473,6 +478,16 @@ export default class MonacoEditor extends React.Component<IMonacoProps> {
         onRegisterCompletionProvider(language);
       } else if (shouldRegisterDefaultCompletion) {
         this.registerDefaultCompletionProvider(language);
+      }
+    }
+  }
+
+  private registerDocumentFormatter() {
+    const { enableFormatting, language, onRegisterDocumentFormattingEditProvider } = this.props;
+
+    if (enableFormatting && language) {
+      if (onRegisterDocumentFormattingEditProvider) {
+        onRegisterDocumentFormattingEditProvider(language);
       }
     }
   }
